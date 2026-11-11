@@ -1,0 +1,79 @@
+{
+  "name": "Z-Barber - webhook WhatsApp (teste)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook GET (verificacao)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "7a1c2b3d-0001-4a6e-9a10-zebarber0001"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.verify_token'] === 'TROQUE_O_TOKEN' ? $json.query['hub.challenge'] : 'token invalido' }}",
+        "options": {}
+      },
+      "name": "Responder challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook POST (mensagens)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 240],
+      "webhookId": "7a1c2b3d-0002-4a6e-9a10-zebarber0002"
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $input.first().json.body?.entry?.[0]?.changes?.[0]?.value;\nconst m = v?.messages?.[0];\nif (!m) return [];\nconst to = m.from ?? v.contacts?.[0]?.wa_id;\nreturn [{ json: { to, texto: m.text?.body ?? '', phone_id: v.metadata.phone_number_id } }];"
+      },
+      "name": "Extrair mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v25.0/{{ $json.phone_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.to, type: 'text', text: { body: 'Oi! Aqui e o Ze. Voce disse: ' + $json.texto } }) }}",
+        "options": {}
+      },
+      "name": "Enviar resposta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 240]
+    }
+  ],
+  "connections": {
+    "Webhook GET (verificacao)": {
+      "main": [[{ "node": "Responder challenge", "type": "main", "index": 0 }]]
+    },
+    "Webhook POST (mensagens)": {
+      "main": [[{ "node": "Extrair mensagem", "type": "main", "index": 0 }]]
+    },
+    "Extrair mensagem": {
+      "main": [[{ "node": "Enviar resposta", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {}
+}
